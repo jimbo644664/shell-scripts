@@ -1,0 +1,64 @@
+#!/bin/bash
+
+function display_error
+{
+    name=`echo "$1" | sed 's|^.*/||'`
+    if [ "$2" ]
+    then
+        echo -e "${name}: error: ${2}: No such file" 1>&2
+    else
+        echo -e "${name}: fatal error: Invalid invocation parameters\n"\
+                "\bUsage: $name [options]... [listfile]...\n\n"\
+                "\bTry \`$name --help' for more information." 1>&2
+        exit
+    fi
+}
+
+function display_help
+{
+    echo "You came here expecting help, but all you receive is sadness."
+    ## TODO: Actual help mode. Add more options to script.
+    exit
+}
+
+if [ $# -eq 0 ]
+then
+    display_error "$0"
+fi
+
+failure=false
+for file in "$@"
+do
+    if [[ "$file" == "--help" ]]
+    then
+        display_help
+    elif ! [ -f "$file" ]
+    then
+        display_error "$0" "$file"
+        failure=true
+    fi
+done
+if $failure
+then
+    display_error "$0"
+fi
+
+for file in "$@"
+do
+    echo '['`date +"%F %T"`']' "Begin file:" "$file" 1>&2
+    while read -r line
+    do
+        if [ "$line" ]
+        then
+            if ! [[ "$line" == "#"* ]]
+            then
+                echo '['`date +"%F %T"`']' "Begin:" "URL:$line" 1>&2
+                wget -qN "$line" \
+                && echo '['`date +"%F %T"`']' "Finish:" "URL:$line" 1>&2 &
+            fi
+        fi
+    done < "$file"
+    wait
+    echo '['`date +"%F %T"`']' "Finish file:" "$file" 1>&2
+done
+
