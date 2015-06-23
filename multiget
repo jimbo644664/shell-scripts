@@ -2,12 +2,18 @@
 
 function display_error
 {
-    if [[ "$1" == "no-file" ]]
+    if   [[ "$1" == "no-args" ]]
     then
-        echo -e "${name}: error: ${2}: No such file" 1>&2
-    elif [[ "$1" == "wget-fail" ]]
+        echo "${name}: error: No arguments or options provided" 1>&2
+    elif [[ "$1" == "no-optn" ]]
     then
-        echo '['`date +"%F %T"`']' "Error:" "URL:${2}:" "Download failed" 1>&2
+        echo "${name}: error: ${2}: No such option" 1>&2
+    elif [[ "$1" == "no-file" ]]
+    then
+        echo "${name}: error: ${2}: No such file" 1>&2
+    elif [[ "$1" == "dl-fail" ]]
+    then
+        echo '['`date +"%F %T"`']' "Error:" "URL:${2}:" "Download failed"
     else
         echo -e "${name}: fatal error!\n\n"\
                 "\bTry \`$name --help' for more information." 1>&2
@@ -17,26 +23,37 @@ function display_error
 
 function display_help
 {
-    echo -e "Usage: $name [listfile]..."
-    exit
+    echo "Usage: $name [listfile]..."
 }
 
 name=`echo "$0" | sed 's|^.*/||'`
 
+failure=false
 if [ $# -eq 0 ]
+then
+    display_error "no-args"
+    failure=true
+fi
+if $failure
 then
     display_error
 fi
 
-failure=false
-for file in "$@"
+helped=false
+for arg in "$@"
 do
-    if [[ "$file" == "--help" ]]
+    if [[ "$arg" == "--"* ]]
     then
-        display_help
-    elif ! [ -f "$file" ]
+        if [[ "$arg" == "--help" ]]
+        then
+            display_help
+            helped=true
+        else
+            display_error "no-optn" "$arg"
+        fi
+    elif ! [ -f "$arg" ]
     then
-        display_error "no-file" "$file"
+        display_error "no-file" "$arg"
         failure=true
     fi
 done
@@ -44,34 +61,41 @@ if $failure
 then
     display_error
 fi
+if $helped
+then
+    exit
+fi
 
 for file in "$@"
 do
-    echo '['`date +"%F %T"`']' "Begin file:" "$file" 1>&2
-    while read -r line
-    do
-        if [ "$line" ]
-        then
-            if ! [[ "$line" == "#"* ]]
+    if [[ "$file" != "--"* ]]
+    then
+        echo '['`date +"%F %T"`']' "Begin file:" "$file"
+        while read -r line
+        do
+            if [ "$line" ]
             then
-                array=($line)
-                if [ "${array[1]}" ]
+                if ! [[ "$line" == "#"* ]]
                 then
-                    echo '['`date +"%F %T"`']' "Begin:" "URL:${array[0]}" '->' "${array[1]}" 1>&2
-                    wget -qN "${array[0]}" -O "${array[1]}" \
-                    && echo '['`date +"%F %T"`']' "Finish:" "URL:${array[0]}" 1>&2 \
-                    || display_error "$0" "wget-fail" "${array[0]}" &
-                else
-                    oname=`echo "$line" | sed 's|^.*/||'`
-                    echo '['`date +"%F %T"`']' "Begin:" "URL:$line" '->' "$oname" 1>&2
-                    wget -qN "$line" -O "$oname" \
-                    && echo '['`date +"%F %T"`']' "Finish:" "URL:$line" 1>&2 \
-                    || display_error "$0" "wget-fail" "$line" &
+                    array=($line)
+                    if [ "${array[1]}" ]
+                    then
+                        echo '['`date +"%F %T"`']' "Begin:" "URL:${array[0]}" '->' "${array[1]}"
+                        wget -qN "${array[0]}" -O "${array[1]}" \
+                        && echo '['`date +"%F %T"`']' "Finish:" "URL:${array[0]}" \
+                        || display_error "$0" "dl-fail" "${array[0]}" &
+                    else
+                        oname=`echo "$line" | sed 's|^.*/||'`
+                        echo '['`date +"%F %T"`']' "Begin:" "URL:$line" '->' "$oname"
+                        wget -qN "$line" -O "$oname" \
+                        && echo '['`date +"%F %T"`']' "Finish:" "URL:$line" \
+                        || display_error "$0" "dl-fail" "$line" &
+                    fi
                 fi
             fi
-        fi
-    done < "$file"
-    wait
-    echo '['`date +"%F %T"`']' "Finish file:" "$file" 1>&2
+        done < "$file"
+        wait
+        echo '['`date +"%F %T"`']' "Finish file:" "$file"
+    fi
 done
 
