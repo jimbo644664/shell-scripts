@@ -3,12 +3,14 @@
 function display_error
 {
     name=`echo "$1" | sed 's|^.*/||'`
-    if [ "$2" ]
+    if [[ "$2" == "--no-file" ]]
     then
-        echo -e "${name}: error: ${2}: No such file" 1>&2
+        echo -e "${name}: error: ${3}: No such file" 1>&2
+    elif [[ "$2" == "--wget-fail" ]]
+    then
+        echo -e "${name}: error: URL:${3}: Download failed" 1>&2
     else
-        echo -e "${name}: fatal error: Invalid invocation parameters\n"\
-                "\bUsage: $name [options]... [listfile]...\n\n"\
+        echo -e "${name}: fatal error!\n\n"\
                 "\bTry \`$name --help' for more information." 1>&2
         exit
     fi
@@ -34,7 +36,7 @@ do
         display_help
     elif ! [ -f "$file" ]
     then
-        display_error "$0" "$file"
+        display_error "$0" "--no-file" "$file"
         failure=true
     fi
 done
@@ -52,9 +54,20 @@ do
         then
             if ! [[ "$line" == "#"* ]]
             then
-                echo '['`date +"%F %T"`']' "Begin:" "URL:$line" 1>&2
-                wget -qN "$line" \
-                && echo '['`date +"%F %T"`']' "Finish:" "URL:$line" 1>&2 &
+                array=($line)
+                if [ "${array[1]}" ]
+                then
+                    echo '['`date +"%F %T"`']' "Begin:" "URL:${array[0]}" '->' "${array[1]}" 1>&2
+                    wget -qN "${array[0]}" -O "${array[1]}" \
+                    && echo '['`date +"%F %T"`']' "Finish:" "URL:${array[0]}" 1>&2 \
+                    || display_error "$0" "--wget-fail" "${array[0]}" &
+                else
+                    name=`echo "$line" | sed 's|^.*/||'`
+                    echo '['`date +"%F %T"`']' "Begin:" "URL:$line" '->' "$name" 1>&2
+                    wget -qN "$line" -O "$name" \
+                    && echo '['`date +"%F %T"`']' "Finish:" "URL:$line" 1>&2 \
+                    || display_error "$0" "--wget-fail" "$line" &
+                fi
             fi
         fi
     done < "$file"
