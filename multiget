@@ -2,7 +2,7 @@
 
 function display_error
 {
-    if   [[ "$1" == "no-args" ]]
+    if [[ "$1" == "no-args" ]]
     then
         echo "${name}: error: No arguments or options provided" 1>&2
     elif [[ "$1" == "no-optn" ]]
